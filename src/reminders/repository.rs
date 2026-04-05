@@ -102,6 +102,22 @@ impl RemindersRepository {
             })
     }
 
+    pub fn delete(&self, id: &str, user_id: &str) -> Result<(), ApiError> {
+        let mut conn = self.get_conn()?;
+        let affected = diesel::delete(
+            reminders::table.filter(reminders::id.eq(id).and(reminders::user_id.eq(user_id))),
+        )
+        .execute(&mut conn)
+        .map_err(|e| {
+            tracing::error!("DB delete reminder error: {:?}", e);
+            ApiError::internal("Database error")
+        })?;
+        if affected == 0 {
+            return Err(ApiError::not_found("Reminder not found"));
+        }
+        Ok(())
+    }
+
     /// Returns all pending (non-completed, non-notified) reminders due on or before `cutoff`.
     /// Used by the reminder engine.
     pub fn find_due(&self, cutoff: NaiveDateTime) -> Result<Vec<ReminderRecord>, ApiError> {

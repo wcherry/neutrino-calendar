@@ -5,7 +5,7 @@ use crate::reminders::{
     },
     service::RemindersService,
 };
-use actix_web::{get, patch, post, web, HttpResponse};
+use actix_web::{delete, get, patch, post, web, HttpResponse};
 use std::sync::Arc;
 use utoipa::OpenApi;
 
@@ -102,16 +102,40 @@ pub async fn update_reminder(
     Ok(web::Json(reminder))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/reminders/{id}",
+    params(("id" = String, Path, description = "Reminder ID")),
+    responses(
+        (status = 204, description = "Reminder deleted"),
+        (status = 404, description = "Not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "reminders"
+)]
+#[delete("/reminders/{id}")]
+pub async fn delete_reminder(
+    state: web::Data<RemindersApiState>,
+    user: AuthenticatedUser,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    state
+        .reminders_service
+        .delete_reminder(&user, &path.into_inner())?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(list_reminders)
         .service(create_reminder)
         .service(get_reminder)
-        .service(update_reminder);
+        .service(update_reminder)
+        .service(delete_reminder);
 }
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(list_reminders, create_reminder, get_reminder, update_reminder),
+    paths(list_reminders, create_reminder, get_reminder, update_reminder, delete_reminder),
     components(schemas(
         CreateReminderRequest,
         UpdateReminderRequest,

@@ -58,6 +58,14 @@ impl RemindersService {
         Ok(reminder_to_response(record))
     }
 
+    pub fn delete_reminder(
+        &self,
+        user: &AuthenticatedUser,
+        reminder_id: &str,
+    ) -> Result<(), ApiError> {
+        self.repo.delete(reminder_id, &user.user_id)
+    }
+
     pub fn update_reminder(
         &self,
         user: &AuthenticatedUser,
