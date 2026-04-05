@@ -129,4 +129,80 @@ impl EventsRepository {
         }
         Ok(())
     }
+
+    /// Insert-or-update an event coming from an external sync source.
+    /// Lookup key is (user_id, source, external_id). If found, updates mutable fields;
+    /// otherwise inserts a new row.
+    pub fn upsert_from_sync(
+        &self,
+        user_id: &str,
+        source: &str,
+        record: NewEventRecord,
+    ) -> Result<(), ApiError> {
+        let mut conn = self.get_conn()?;
+
+        let existing_id: Option<String> = events::table
+            .filter(
+                events::user_id
+                    .eq(user_id)
+                    .and(events::source.eq(source))
+                    .and(events::external_id.eq(&record.external_id)),
+            )
+            .select(events::id)
+            .first::<String>(&mut conn)
+            .optional()
+            .map_err(|e| {
+                tracing::error!("DB upsert_from_sync lookup error: {:?}", e);
+                ApiError::internal("Database error")
+            })?;
+
+        if let Some(existing) = existing_id {
+            let changes = UpdateEventRecord {
+                title: Some(record.title),
+                description: Some(record.description),
+                start_time: Some(record.start_time),
+                end_time: Some(record.end_time),
+                all_day: Some(record.all_day),
+                location: Some(record.location),
+                recurrence_rule: Some(record.recurrence_rule),
+                updated_at: record.updated_at,
+            };
+            diesel::update(events::table.filter(events::id.eq(&existing)))
+                .set(&changes)
+                .execute(&mut conn)
+                .map_err(|e| {
+                    tracing::error!("DB upsert_from_sync update error: {:?}", e);
+                    ApiError::internal("Database error")
+                })?;
+        } else {
+            diesel::insert_into(events::table)
+                .values(&record)
+                .execute(&mut conn)
+                .map_err(|e| {
+                    tracing::error!("DB upsert_from_sync insert error: {:?}", e);
+                    ApiError::internal("Database error")
+                })?;
+        }
+
+        Ok(())
+    }
+
+    /// Delete an externally-sourced event by its external ID (used when the provider reports deletion).
+    pub fn delete_by_external(&self, user_id: &str, source: &str, external_id: &str) -> Result<(), ApiError> {
+        let mut conn = self.get_conn()?;
+        diesel::delete(
+            events::table.filter(
+                events::user_id
+                    .eq(user_id)
+                    .and(events::source.eq(source))
+                    .and(events::external_id.eq(external_id)),
+            ),
+        )
+        .execute(&mut conn)
+        .map_err(|e| {
+            tracing::error!("DB delete_by_external error: {:?}", e);
+            ApiError::internal("Database error")
+        })?;
+        Ok(())
+    }
 }

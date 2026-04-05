@@ -1018,6 +1018,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ical"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4bad4eb99ee34e58a1e642114eded65b4ea5ea3c1584971a1afc12a3b927670"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "icu_collections"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1385,20 +1394,24 @@ version = "0.1.0"
 dependencies = [
  "actix-cors",
  "actix-web",
+ "base64",
  "chrono",
  "diesel",
  "diesel_migrations",
  "dotenvy",
+ "ical",
  "jsonwebtoken",
  "libsqlite3-sys",
  "log",
  "neutrino-shared",
+ "quick-xml",
  "reqwest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "url",
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
@@ -1633,6 +1646,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.36.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

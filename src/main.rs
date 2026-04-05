@@ -23,6 +23,9 @@ use crate::config::Config;
 use crate::events::api::EventsApiState;
 use crate::events::repository::EventsRepository;
 use crate::events::service::EventsService;
+use crate::connections::api::ConnectionsApiState;
+use crate::connections::repository::ConnectionsRepository;
+use crate::connections::service::ConnectionsService;
 use crate::reminders::api::RemindersApiState;
 use crate::reminders::repository::RemindersRepository;
 use crate::reminders::service::RemindersService;
@@ -71,9 +74,15 @@ async fn health(pool: web::Data<DbPool>) -> impl Responder {
     }
 }
 
+use crate::connections::dto::{
+    ConnectAppleRequest as ConnectRequest,
+    ConnectionResponse as ConnectResponse,
+    ListConnectionsResponse,
+    OAuthInitResponse,
+    TriggerSyncRequest,
+};
 use crate::events::dto::{CreateEventRequest, EventResponse, ListEventsQuery, ListEventsResponse, UpdateEventRequest};
 use crate::reminders::dto::{CreateReminderRequest, ListRemindersResponse, ReminderResponse, UpdateReminderRequest};
-use crate::connections::api::{ConnectRequest, ConnectResponse};
 
 struct SecurityAddon;
 
@@ -104,9 +113,13 @@ impl Modify for SecurityAddon {
         reminders::api::create_reminder,
         reminders::api::get_reminder,
         reminders::api::update_reminder,
-        connections::api::connect_google,
-        connections::api::connect_outlook,
+        connections::api::list_connections,
+        connections::api::initiate_google,
+        connections::api::google_callback,
+        connections::api::initiate_outlook,
+        connections::api::outlook_callback,
         connections::api::connect_apple,
+        connections::api::disconnect_connection,
         connections::api::trigger_sync,
     ),
     components(
@@ -116,6 +129,7 @@ impl Modify for SecurityAddon {
             CreateReminderRequest, UpdateReminderRequest,
             ReminderResponse, ListRemindersResponse,
             ConnectRequest, ConnectResponse,
+            ListConnectionsResponse, OAuthInitResponse, TriggerSyncRequest,
         )
     ),
     modifiers(&SecurityAddon),
@@ -155,12 +169,20 @@ async fn main() -> std::io::Result<()> {
     let token_service = Arc::new(TokenService::new(config.jwt_secret.clone()));
 
     let events_repo = Arc::new(EventsRepository::new(pool.clone()));
-    let events_service = Arc::new(EventsService::new(events_repo));
+    let events_service = Arc::new(EventsService::new(events_repo.clone()));
     let events_state = web::Data::new(EventsApiState { events_service });
 
     let reminders_repo = Arc::new(RemindersRepository::new(pool.clone()));
     let reminders_service = Arc::new(RemindersService::new(reminders_repo.clone()));
     let reminders_state = web::Data::new(RemindersApiState { reminders_service });
+
+    let connections_repo = Arc::new(ConnectionsRepository::new(pool.clone()));
+    let connections_service = Arc::new(ConnectionsService::new(
+        connections_repo,
+        events_repo,
+        config.oauth.clone(),
+    ));
+    let connections_state = web::Data::new(ConnectionsApiState { connections_service });
 
     // Phase 4: spawn reminder engine background worker
     let engine_repo = reminders_repo.clone();
@@ -181,6 +203,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(pool_data.clone())
             .app_data(events_state.clone())
             .app_data(reminders_state.clone())
+            .app_data(connections_state.clone())
             .app_data(token_service_data.clone())
             .wrap(Logger::default())
             .wrap(Cors::permissive())

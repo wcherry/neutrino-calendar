@@ -52,5 +52,7 @@ diesel::table! {
         sync_cursor -> Nullable<Text>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        email -> Nullable<Text>,
+        caldav_url -> Nullable<Text>,
     }
 }

@@ -1,110 +1,256 @@
-use actix_web::{post, web, HttpResponse};
-use serde::{Deserialize, Serialize};
-use utoipa::{OpenApi, ToSchema};
+use crate::common::{ApiError, AuthenticatedUser};
+use crate::connections::dto::{
+    ConnectAppleRequest, ConnectionResponse, ListConnectionsResponse, OAuthInitResponse,
+    TriggerSyncRequest,
+};
+use crate::connections::service::ConnectionsService;
+use actix_web::{delete, get, post, web, HttpResponse};
+use std::sync::Arc;
+use utoipa::OpenApi;
 
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectRequest {
-    /// OAuth authorization code from the provider.
-    pub code: String,
-    /// Redirect URI used during the OAuth flow.
-    pub redirect_uri: String,
+pub struct ConnectionsApiState {
+    pub connections_service: Arc<ConnectionsService>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectResponse {
-    pub provider: String,
-    pub connected: bool,
+// ── List ──────────────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/connections",
+    responses(
+        (status = 200, description = "List of connected calendar providers", body = ListConnectionsResponse),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "connections"
+)]
+#[get("/connections")]
+pub async fn list_connections(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+) -> Result<web::Json<ListConnectionsResponse>, ApiError> {
+    let result = state.connections_service.list_connections(&user)?;
+    Ok(web::Json(result))
 }
 
-/// Connect a Google Calendar account (Phase 3).
+// ── Google ────────────────────────────────────────────────────────────────────
+
 #[utoipa::path(
     post,
     path = "/api/v1/connections/google",
-    request_body = ConnectRequest,
     responses(
-        (status = 200, description = "Connected", body = ConnectResponse),
-        (status = 501, description = "Not yet implemented"),
+        (status = 200, description = "OAuth2 authorization URL to redirect the user to", body = OAuthInitResponse),
+        (status = 400, description = "Google OAuth not configured"),
     ),
     security(("bearer_auth" = [])),
     tag = "connections"
 )]
 #[post("/connections/google")]
-pub async fn connect_google(_body: web::Json<ConnectRequest>) -> HttpResponse {
-    HttpResponse::NotImplemented().json(serde_json::json!({
-        "error": { "code": "NOT_IMPLEMENTED", "message": "Google Calendar sync coming in Phase 3" }
-    }))
+pub async fn initiate_google(
+    state: web::Data<ConnectionsApiState>,
+    _user: AuthenticatedUser,
+) -> Result<web::Json<OAuthInitResponse>, ApiError> {
+    let result = state.connections_service.initiate_google()?;
+    Ok(web::Json(result))
 }
 
-/// Connect an Outlook calendar account (Phase 3).
+#[derive(serde::Deserialize)]
+pub struct OAuthCallbackQuery {
+    pub code: String,
+    pub state: Option<String>,
+    pub error: Option<String>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/connections/google/callback",
+    params(
+        ("code" = String, Query, description = "Authorization code from Google"),
+        ("state" = Option<String>, Query, description = "State parameter"),
+    ),
+    responses(
+        (status = 200, description = "Connection established", body = ConnectionResponse),
+        (status = 400, description = "OAuth error"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "connections"
+)]
+#[get("/connections/google/callback")]
+pub async fn google_callback(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    query: web::Query<OAuthCallbackQuery>,
+) -> Result<web::Json<ConnectionResponse>, ApiError> {
+    if let Some(err) = &query.error {
+        return Err(ApiError::bad_request(&format!("Google OAuth error: {}", err)));
+    }
+    let conn = state
+        .connections_service
+        .connect_google(&user, &query.code)
+        .await?;
+    Ok(web::Json(conn))
+}
+
+// ── Outlook ───────────────────────────────────────────────────────────────────
+
 #[utoipa::path(
     post,
     path = "/api/v1/connections/outlook",
-    request_body = ConnectRequest,
     responses(
-        (status = 200, description = "Connected", body = ConnectResponse),
-        (status = 501, description = "Not yet implemented"),
+        (status = 200, description = "OAuth2 authorization URL to redirect the user to", body = OAuthInitResponse),
+        (status = 400, description = "Outlook OAuth not configured"),
     ),
     security(("bearer_auth" = [])),
     tag = "connections"
 )]
 #[post("/connections/outlook")]
-pub async fn connect_outlook(_body: web::Json<ConnectRequest>) -> HttpResponse {
-    HttpResponse::NotImplemented().json(serde_json::json!({
-        "error": { "code": "NOT_IMPLEMENTED", "message": "Outlook calendar sync coming in Phase 3" }
-    }))
+pub async fn initiate_outlook(
+    state: web::Data<ConnectionsApiState>,
+    _user: AuthenticatedUser,
+) -> Result<web::Json<OAuthInitResponse>, ApiError> {
+    let result = state.connections_service.initiate_outlook()?;
+    Ok(web::Json(result))
 }
 
-/// Connect an Apple / iCloud calendar account via CalDAV (Phase 3).
+#[utoipa::path(
+    get,
+    path = "/api/v1/connections/outlook/callback",
+    params(
+        ("code" = String, Query, description = "Authorization code from Microsoft"),
+        ("state" = Option<String>, Query, description = "State parameter"),
+    ),
+    responses(
+        (status = 200, description = "Connection established", body = ConnectionResponse),
+        (status = 400, description = "OAuth error"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "connections"
+)]
+#[get("/connections/outlook/callback")]
+pub async fn outlook_callback(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    query: web::Query<OAuthCallbackQuery>,
+) -> Result<web::Json<ConnectionResponse>, ApiError> {
+    if let Some(err) = &query.error {
+        return Err(ApiError::bad_request(&format!("Outlook OAuth error: {}", err)));
+    }
+    let conn = state
+        .connections_service
+        .connect_outlook(&user, &query.code)
+        .await?;
+    Ok(web::Json(conn))
+}
+
+// ── Apple ─────────────────────────────────────────────────────────────────────
+
 #[utoipa::path(
     post,
     path = "/api/v1/connections/apple",
-    request_body = ConnectRequest,
+    request_body = ConnectAppleRequest,
     responses(
-        (status = 200, description = "Connected", body = ConnectResponse),
-        (status = 501, description = "Not yet implemented"),
+        (status = 200, description = "Apple CalDAV connection established", body = ConnectionResponse),
+        (status = 400, description = "Invalid credentials or CalDAV URL"),
     ),
     security(("bearer_auth" = [])),
     tag = "connections"
 )]
 #[post("/connections/apple")]
-pub async fn connect_apple(_body: web::Json<ConnectRequest>) -> HttpResponse {
-    HttpResponse::NotImplemented().json(serde_json::json!({
-        "error": { "code": "NOT_IMPLEMENTED", "message": "Apple CalDAV sync coming in Phase 3" }
-    }))
+pub async fn connect_apple(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    body: web::Json<ConnectAppleRequest>,
+) -> Result<web::Json<ConnectionResponse>, ApiError> {
+    let conn = state
+        .connections_service
+        .connect_apple(&user, body.into_inner())
+        .await?;
+    Ok(web::Json(conn))
 }
 
-/// Trigger an immediate sync for all connected providers (Phase 3).
+// ── Disconnect ────────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/connections/{id}",
+    params(("id" = String, Path, description = "Connection ID")),
+    responses(
+        (status = 204, description = "Connection removed"),
+        (status = 404, description = "Not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "connections"
+)]
+#[delete("/connections/{id}")]
+pub async fn disconnect_connection(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    state
+        .connections_service
+        .disconnect(&user, &path.into_inner())?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// ── Sync trigger ──────────────────────────────────────────────────────────────
+
 #[utoipa::path(
     post,
     path = "/api/v1/sync/trigger",
+    request_body = TriggerSyncRequest,
     responses(
-        (status = 202, description = "Sync enqueued"),
-        (status = 501, description = "Not yet implemented"),
+        (status = 202, description = "Sync started"),
     ),
     security(("bearer_auth" = [])),
     tag = "connections"
 )]
 #[post("/sync/trigger")]
-pub async fn trigger_sync() -> HttpResponse {
-    HttpResponse::NotImplemented().json(serde_json::json!({
-        "error": { "code": "NOT_IMPLEMENTED", "message": "External sync coming in Phase 3" }
-    }))
+pub async fn trigger_sync(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    body: web::Json<TriggerSyncRequest>,
+) -> Result<HttpResponse, ApiError> {
+    state
+        .connections_service
+        .trigger_sync(&user, body.into_inner())
+        .await?;
+    Ok(HttpResponse::Accepted().finish())
 }
 
+// ── Router ────────────────────────────────────────────────────────────────────
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(connect_google)
-        .service(connect_outlook)
+    cfg.service(list_connections)
+        .service(initiate_google)
+        .service(google_callback)
+        .service(initiate_outlook)
+        .service(outlook_callback)
         .service(connect_apple)
+        .service(disconnect_connection)
         .service(trigger_sync);
 }
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(connect_google, connect_outlook, connect_apple, trigger_sync),
-    components(schemas(ConnectRequest, ConnectResponse)),
+    paths(
+        list_connections,
+        initiate_google,
+        google_callback,
+        initiate_outlook,
+        outlook_callback,
+        connect_apple,
+        disconnect_connection,
+        trigger_sync,
+    ),
+    components(schemas(
+        ConnectAppleRequest,
+        ConnectionResponse,
+        ListConnectionsResponse,
+        OAuthInitResponse,
+        TriggerSyncRequest,
+    )),
     tags((name = "connections", description = "External calendar provider connections")),
     security(("bearer_auth" = []))
 )]
 pub struct ConnectionsApiDoc;
+
