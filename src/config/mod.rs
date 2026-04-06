@@ -1,4 +1,5 @@
 use std::env;
+use shared::get_env_or_secret;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -33,7 +34,7 @@ impl Config {
             .map_err(|e| format!("Invalid PORT: {}", e))?;
 
         let jwt_secret =
-            env::var("JWT_SECRET").map_err(|_| "JWT_SECRET environment variable is required")?;
+            get_env_or_secret("JWT_SECRET").map_err(|_| "JWT_SECRET environment variable is required")?;
 
         if jwt_secret.is_empty() {
             return Err("JWT_SECRET must not be empty".to_string());
@@ -46,13 +47,13 @@ impl Config {
             .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
         let oauth = OAuthConfig {
-            google_client_id: env::var("GOOGLE_CLIENT_ID").ok(),
-            google_client_secret: env::var("GOOGLE_CLIENT_SECRET").ok(),
-            google_redirect_uri: env::var("GOOGLE_REDIRECT_URI")
+            google_client_id: get_env_or_secret("GOOGLE_CLIENT_ID").ok(),
+            google_client_secret: get_env_or_secret("GOOGLE_CLIENT_SECRET").ok(),
+            google_redirect_uri: get_env_or_secret("GOOGLE_REDIRECT_URI")
                 .unwrap_or_else(|_| format!("{}/api/v1/connections/google/callback", default_base)),
-            outlook_client_id: env::var("OUTLOOK_CLIENT_ID").ok(),
-            outlook_client_secret: env::var("OUTLOOK_CLIENT_SECRET").ok(),
-            outlook_redirect_uri: env::var("OUTLOOK_REDIRECT_URI")
+            outlook_client_id: get_env_or_secret("OUTLOOK_CLIENT_ID").ok(),
+            outlook_client_secret: get_env_or_secret("OUTLOOK_CLIENT_SECRET").ok(),
+            outlook_redirect_uri: get_env_or_secret("OUTLOOK_REDIRECT_URI")
                 .unwrap_or_else(|_| format!("{}/api/v1/connections/outlook/callback", default_base)),
         };
 

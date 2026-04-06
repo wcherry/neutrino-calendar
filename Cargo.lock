@@ -1420,7 +1420,7 @@ dependencies = [
 [[package]]
 name = "neutrino-shared"
 version = "0.1.0"
-source = "git+https://github.com/wcherry/neutrino-shared.git#fe3691a5f5bf5d6949c77ce01255e1e8aa99447e"
+source = "git+https://github.com/wcherry/neutrino-shared.git#306170a9e7dafc9b8cd5a5d15c754487a63a45ad"
 dependencies = [
  "actix-web",
  "chrono",

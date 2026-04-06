@@ -27,6 +27,8 @@ pub fn build_auth_url(cfg: &OAuthConfig, state: &str) -> Result<String, ApiError
         .append_pair("prompt", "consent")
         .append_pair("state", state);
 
+    tracing::info!("GOOGLE CAL API: {}", &url.to_string());
+    
     Ok(url.to_string())
 }
 
