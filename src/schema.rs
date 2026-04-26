@@ -37,7 +37,17 @@ diesel::table! {
     event_attachments (id) {
         id -> Text,
         event_id -> Text,
-        file_id -> Text,
+        file_id -> Nullable<Text>,
+        name -> Nullable<Text>,
+        note -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    event_attendees (id) {
+        id -> Text,
+        event_id -> Text,
+        email -> Text,
     }
 }
 

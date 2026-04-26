@@ -14,6 +14,8 @@ pub struct CreateEventRequest {
     pub all_day: bool,
     pub location: Option<String>,
     pub recurrence_rule: Option<String>,
+    #[serde(default)]
+    pub attendees: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -26,6 +28,7 @@ pub struct UpdateEventRequest {
     pub all_day: Option<bool>,
     pub location: Option<String>,
     pub recurrence_rule: Option<String>,
+    pub attendees: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -50,6 +53,7 @@ pub struct EventResponse {
     pub all_day: bool,
     pub location: Option<String>,
     pub recurrence_rule: Option<String>,
+    pub attendees: Vec<String>,
     pub source: String,
     pub created_at: String,
     pub updated_at: String,

@@ -1,7 +1,8 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::reminders::{
     dto::{
-        CreateReminderRequest, ListRemindersResponse, ReminderResponse, UpdateReminderRequest,
+        CreateReminderRequest, ListRemindersQuery, ListRemindersResponse, ReminderResponse,
+        UpdateReminderRequest,
     },
     model::{NewReminderRecord, UpdateReminderRecord},
     repository::RemindersRepository,
@@ -22,8 +23,13 @@ impl RemindersService {
     pub fn list_reminders(
         &self,
         user: &AuthenticatedUser,
+        query: ListRemindersQuery,
     ) -> Result<ListRemindersResponse, ApiError> {
-        let records = self.repo.find_by_user(&user.user_id)?;
+        let records = if let Some(event_id) = query.event_id {
+            self.repo.find_by_event(&user.user_id, &event_id)?
+        } else {
+            self.repo.find_by_user(&user.user_id)?
+        };
         let reminders = records.into_iter().map(reminder_to_response).collect();
         Ok(ListRemindersResponse { reminders })
     }

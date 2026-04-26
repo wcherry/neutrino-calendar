@@ -58,6 +58,23 @@ impl RemindersRepository {
             })
     }
 
+    pub fn find_by_event(&self, user_id: &str, event_id: &str) -> Result<Vec<ReminderRecord>, ApiError> {
+        let mut conn = self.get_conn()?;
+        reminders::table
+            .filter(
+                reminders::user_id
+                    .eq(user_id)
+                    .and(reminders::linked_event_id.eq(event_id)),
+            )
+            .order(reminders::due_time.asc())
+            .select(ReminderRecord::as_select())
+            .load(&mut conn)
+            .map_err(|e| {
+                tracing::error!("DB list event reminders error: {:?}", e);
+                ApiError::internal("Database error")
+            })
+    }
+
     pub fn find_by_id(&self, id: &str, user_id: &str) -> Result<ReminderRecord, ApiError> {
         let mut conn = self.get_conn()?;
         reminders::table

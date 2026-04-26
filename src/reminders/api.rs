@@ -1,7 +1,8 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::reminders::{
     dto::{
-        CreateReminderRequest, ListRemindersResponse, ReminderResponse, UpdateReminderRequest,
+        CreateReminderRequest, ListRemindersQuery, ListRemindersResponse, ReminderResponse,
+        UpdateReminderRequest,
     },
     service::RemindersService,
 };
@@ -16,6 +17,9 @@ pub struct RemindersApiState {
 #[utoipa::path(
     get,
     path = "/api/v1/reminders",
+    params(
+        ("eventId" = Option<String>, Query, description = "Filter by linked event ID"),
+    ),
     responses(
         (status = 200, description = "List of reminders", body = ListRemindersResponse),
     ),
@@ -26,8 +30,9 @@ pub struct RemindersApiState {
 pub async fn list_reminders(
     state: web::Data<RemindersApiState>,
     user: AuthenticatedUser,
+    query: web::Query<ListRemindersQuery>,
 ) -> Result<web::Json<ListRemindersResponse>, ApiError> {
-    let result = state.reminders_service.list_reminders(&user)?;
+    let result = state.reminders_service.list_reminders(&user, query.into_inner())?;
     Ok(web::Json(result))
 }
 

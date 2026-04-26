@@ -10,6 +10,7 @@ use shared::init_logging;
 use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme}, Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
 
+mod attachments;
 mod common;
 mod config;
 mod connections;
@@ -18,9 +19,13 @@ mod reminder_engine;
 mod reminders;
 mod schema;
 
+use crate::attachments::api::AttachmentsApiState;
+use crate::attachments::repository::AttachmentsRepository;
+use crate::attachments::service::AttachmentsService;
 use crate::common::TokenService;
 use crate::config::Config;
 use crate::events::api::EventsApiState;
+use crate::events::attendees::AttendeesRepository;
 use crate::events::repository::EventsRepository;
 use crate::events::service::EventsService;
 use crate::connections::api::ConnectionsApiState;
@@ -74,6 +79,7 @@ async fn health(pool: web::Data<DbPool>) -> impl Responder {
     }
 }
 
+use crate::attachments::dto::{AttachmentResponse, CreateAttachmentRequest, ListAttachmentsResponse};
 use crate::connections::dto::{
     ConnectAppleRequest as ConnectRequest,
     ConnectionResponse as ConnectResponse,
@@ -113,6 +119,9 @@ impl Modify for SecurityAddon {
         reminders::api::create_reminder,
         reminders::api::get_reminder,
         reminders::api::update_reminder,
+        attachments::api::list_attachments,
+        attachments::api::create_attachment,
+        attachments::api::delete_attachment,
         connections::api::list_connections,
         connections::api::initiate_google,
         connections::api::google_callback,
@@ -128,6 +137,7 @@ impl Modify for SecurityAddon {
             EventResponse, ListEventsResponse,
             CreateReminderRequest, UpdateReminderRequest,
             ReminderResponse, ListRemindersResponse,
+            CreateAttachmentRequest, AttachmentResponse, ListAttachmentsResponse,
             ConnectRequest, ConnectResponse,
             ListConnectionsResponse, OAuthInitResponse, TriggerSyncRequest,
         )
@@ -136,6 +146,7 @@ impl Modify for SecurityAddon {
     tags(
         (name = "events",      description = "Calendar events"),
         (name = "reminders",   description = "Reminders and tasks"),
+        (name = "attachments", description = "Event attachments and notes"),
         (name = "connections", description = "External calendar provider connections"),
     ),
     security(("bearer_auth" = []))
@@ -168,13 +179,18 @@ async fn main() -> std::io::Result<()> {
 
     let token_service = Arc::new(TokenService::new(config.jwt_secret.clone()));
 
+    let attendees_repo = Arc::new(AttendeesRepository::new(pool.clone()));
     let events_repo = Arc::new(EventsRepository::new(pool.clone()));
-    let events_service = Arc::new(EventsService::new(events_repo.clone()));
+    let events_service = Arc::new(EventsService::new(events_repo.clone(), attendees_repo));
     let events_state = web::Data::new(EventsApiState { events_service });
 
     let reminders_repo = Arc::new(RemindersRepository::new(pool.clone()));
     let reminders_service = Arc::new(RemindersService::new(reminders_repo.clone()));
     let reminders_state = web::Data::new(RemindersApiState { reminders_service });
+
+    let attachments_repo = Arc::new(AttachmentsRepository::new(pool.clone()));
+    let attachments_service = Arc::new(AttachmentsService::new(attachments_repo));
+    let attachments_state = web::Data::new(AttachmentsApiState { attachments_service });
 
     let connections_repo = Arc::new(ConnectionsRepository::new(pool.clone()));
     let connections_service = Arc::new(ConnectionsService::new(
@@ -203,6 +219,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(pool_data.clone())
             .app_data(events_state.clone())
             .app_data(reminders_state.clone())
+            .app_data(attachments_state.clone())
             .app_data(connections_state.clone())
             .app_data(token_service_data.clone())
             .wrap(Logger::default())
@@ -212,6 +229,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/v1")
                     .configure(events::api::configure)
                     .configure(reminders::api::configure)
+                    .configure(attachments::api::configure)
                     .configure(connections::api::configure),
             )
             .service(

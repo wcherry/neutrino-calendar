@@ -1,7 +1,14 @@
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 // ── Request types ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ListRemindersQuery {
+    /// Filter to reminders linked to a specific event ID
+    pub event_id: Option<String>,
+}
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
