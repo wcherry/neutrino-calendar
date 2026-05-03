@@ -162,7 +162,8 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     });
 
-    init_logging(&config.log_level, config.log_path.clone());
+    // Must be held for the lifetime of main — dropping it shuts down the background log flush thread.
+    let _log_guard = init_logging(&config.log_level, config.log_path.clone());
 
     info!("Starting Neutrino Calendar service");
     info!("Connecting to database: {}", config.database_url);
