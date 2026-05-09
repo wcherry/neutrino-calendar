@@ -15,6 +15,7 @@ diesel::table! {
         source -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        timezone -> Nullable<Text>,
     }
 }
 

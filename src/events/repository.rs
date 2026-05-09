@@ -166,6 +166,7 @@ impl EventsRepository {
                 location: Some(record.location),
                 recurrence_rule: Some(record.recurrence_rule),
                 updated_at: record.updated_at,
+                timezone: Some(record.timezone),
             };
             diesel::update(events::table.filter(events::id.eq(&existing)))
                 .set(&changes)

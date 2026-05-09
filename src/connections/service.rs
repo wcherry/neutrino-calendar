@@ -270,6 +270,7 @@ impl ConnectionsService {
                 source: "google".to_string(),
                 created_at: now,
                 updated_at: now,
+                timezone: None,
             };
 
             self.events_repo
@@ -341,6 +342,7 @@ impl ConnectionsService {
                 source: "outlook".to_string(),
                 created_at: now,
                 updated_at: now,
+                timezone: None,
             };
 
             self.events_repo
@@ -392,6 +394,7 @@ impl ConnectionsService {
                 source: "apple".to_string(),
                 created_at: now,
                 updated_at: now,
+                timezone: None,
             };
 
             self.events_repo

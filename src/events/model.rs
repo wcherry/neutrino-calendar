@@ -19,6 +19,7 @@ pub struct EventRecord {
     pub source: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Insertable)]
@@ -37,6 +38,7 @@ pub struct NewEventRecord {
     pub source: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, AsChangeset)]
@@ -50,4 +52,5 @@ pub struct UpdateEventRecord {
     pub location: Option<Option<String>>,
     pub recurrence_rule: Option<Option<String>>,
     pub updated_at: NaiveDateTime,
+    pub timezone: Option<Option<String>>,
 }
