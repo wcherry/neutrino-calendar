@@ -60,6 +60,7 @@ impl EventsService {
             source: "local".to_string(),
             created_at: now,
             updated_at: now,
+            timezone: req.timezone,
         };
         let saved = self.repo.insert(record)?;
         self.attendees_repo.replace_for_event(&id, &req.attendees)?;
@@ -92,6 +93,7 @@ impl EventsService {
             location: req.location.map(Some),
             recurrence_rule: req.recurrence_rule.map(Some),
             updated_at: Utc::now().naive_utc(),
+            timezone: req.timezone.map(Some),
         };
         let updated = self.repo.update(event_id, &user.user_id, changes)?;
         if let Some(emails) = req.attendees {
@@ -132,5 +134,6 @@ fn event_to_response(r: crate::events::model::EventRecord, attendees: Vec<String
         source: r.source,
         created_at: r.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         updated_at: r.updated_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        timezone: r.timezone,
     }
 }

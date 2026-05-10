@@ -16,6 +16,7 @@ pub struct CreateEventRequest {
     pub recurrence_rule: Option<String>,
     #[serde(default)]
     pub attendees: Vec<String>,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -29,6 +30,7 @@ pub struct UpdateEventRequest {
     pub location: Option<String>,
     pub recurrence_rule: Option<String>,
     pub attendees: Option<Vec<String>>,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -57,6 +59,7 @@ pub struct EventResponse {
     pub source: String,
     pub created_at: String,
     pub updated_at: String,
+    pub timezone: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
