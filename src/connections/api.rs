@@ -1,7 +1,7 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::connections::dto::{
-    ConnectAppleRequest, ConnectionResponse, ListConnectionsResponse, OAuthInitResponse,
-    TriggerSyncRequest,
+    CompleteGoogleRequest, ConnectAppleRequest, ConnectionResponse, ListConnectionsResponse,
+    OAuthInitResponse, TriggerSyncRequest,
 };
 use crate::connections::service::ConnectionsService;
 use actix_web::{delete, get, post, web, HttpResponse};
@@ -86,6 +86,33 @@ pub async fn google_callback(
     let conn = state
         .connections_service
         .connect_google(&user, &query.code)
+        .await?;
+    Ok(web::Json(conn))
+}
+
+/// Authenticated endpoint: the frontend POSTs the authorization code it captured
+/// from the OAuth redirect URL.  This avoids requiring a Bearer token on the
+/// raw redirect URI that Google calls (where the browser has no JWT header).
+#[utoipa::path(
+    post,
+    path = "/api/v1/connections/google/complete",
+    request_body = CompleteGoogleRequest,
+    responses(
+        (status = 200, description = "Google Calendar connection established", body = ConnectionResponse),
+        (status = 400, description = "OAuth code exchange failed"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "connections"
+)]
+#[post("/connections/google/complete")]
+pub async fn complete_google(
+    state: web::Data<ConnectionsApiState>,
+    user: AuthenticatedUser,
+    body: web::Json<CompleteGoogleRequest>,
+) -> Result<web::Json<ConnectionResponse>, ApiError> {
+    let conn = state
+        .connections_service
+        .connect_google(&user, &body.code)
         .await?;
     Ok(web::Json(conn))
 }
@@ -223,6 +250,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(list_connections)
         .service(initiate_google)
         .service(google_callback)
+        .service(complete_google)
         .service(initiate_outlook)
         .service(outlook_callback)
         .service(connect_apple)
@@ -236,6 +264,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         list_connections,
         initiate_google,
         google_callback,
+        complete_google,
         initiate_outlook,
         outlook_callback,
         connect_apple,
@@ -243,6 +272,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         trigger_sync,
     ),
     components(schemas(
+        CompleteGoogleRequest,
         ConnectAppleRequest,
         ConnectionResponse,
         ListConnectionsResponse,
