@@ -47,8 +47,8 @@ impl ConnectionsService {
 
     // ── Google OAuth ──────────────────────────────────────────────────────────
 
-    pub fn initiate_google(&self) -> Result<OAuthInitResponse, ApiError> {
-        let state = Uuid::new_v4().to_string();
+    pub fn initiate_google(&self, user_id: &str) -> Result<OAuthInitResponse, ApiError> {
+        let state = format!("{}:{}", user_id, Uuid::new_v4());
         let auth_url = google::build_auth_url(&self.oauth, &state)?;
         Ok(OAuthInitResponse { auth_url })
     }
@@ -169,37 +169,39 @@ impl ConnectionsService {
         &self,
         user: &AuthenticatedUser,
         req: TriggerSyncRequest,
-    ) -> Result<(), ApiError> {
+    ) -> Result<usize, ApiError> {
         let connections = if let Some(id) = req.connection_id {
             vec![self.repo.find_by_id(&id, &user.user_id)?]
         } else {
             self.repo.find_by_user(&user.user_id)?
         };
 
+        let mut total = 0usize;
         for conn in connections {
-            if let Err(e) = self.sync_connection(conn).await {
-                tracing::error!("Sync error: {:?}", e);
+            match self.sync_connection(conn).await {
+                Ok(n) => total += n,
+                Err(e) => tracing::error!("Sync error: {:?}", e),
             }
         }
 
-        Ok(())
+        Ok(total)
     }
 
     // ── Internal sync ─────────────────────────────────────────────────────────
 
-    async fn sync_connection(&self, conn: ConnectionRecord) -> Result<(), ApiError> {
+    async fn sync_connection(&self, conn: ConnectionRecord) -> Result<usize, ApiError> {
         match conn.provider.as_str() {
             "google" => self.sync_google(conn).await,
             "outlook" => self.sync_outlook(conn).await,
             "apple" => self.sync_apple(conn).await,
             other => {
                 tracing::warn!("Unknown provider: {}", other);
-                Ok(())
+                Ok(0)
             }
         }
     }
 
-    async fn sync_google(&self, conn: ConnectionRecord) -> Result<(), ApiError> {
+    async fn sync_google(&self, conn: ConnectionRecord) -> Result<usize, ApiError> {
         let (access_token, new_expiry, new_refresh) = google::ensure_valid_token(
             &self.oauth,
             &self.http,
@@ -236,6 +238,7 @@ impl ConnectionsService {
         );
 
         let now = Utc::now().naive_utc();
+        let mut count = 0usize;
         for ev in events {
             if ev.status.as_deref() == Some("cancelled") {
                 self.events_repo
@@ -275,16 +278,17 @@ impl ConnectionsService {
 
             self.events_repo
                 .upsert_from_sync(&conn.user_id, "google", record)?;
+            count += 1;
         }
 
         if next_cursor.is_some() {
             self.repo.update_sync_cursor(&conn.id, next_cursor)?;
         }
 
-        Ok(())
+        Ok(count)
     }
 
-    async fn sync_outlook(&self, conn: ConnectionRecord) -> Result<(), ApiError> {
+    async fn sync_outlook(&self, conn: ConnectionRecord) -> Result<usize, ApiError> {
         let (access_token, new_expiry, new_refresh) = outlook::ensure_valid_token(
             &self.oauth,
             &self.http,
@@ -313,6 +317,7 @@ impl ConnectionsService {
         );
 
         let now = Utc::now().naive_utc();
+        let mut count = 0usize;
         for ev in events {
             if outlook::is_removed(&ev) {
                 self.events_repo
@@ -347,16 +352,17 @@ impl ConnectionsService {
 
             self.events_repo
                 .upsert_from_sync(&conn.user_id, "outlook", record)?;
+            count += 1;
         }
 
         if next_cursor.is_some() {
             self.repo.update_sync_cursor(&conn.id, next_cursor)?;
         }
 
-        Ok(())
+        Ok(count)
     }
 
-    async fn sync_apple(&self, conn: ConnectionRecord) -> Result<(), ApiError> {
+    async fn sync_apple(&self, conn: ConnectionRecord) -> Result<usize, ApiError> {
         let caldav_url = conn
             .caldav_url
             .as_deref()
@@ -372,6 +378,7 @@ impl ConnectionsService {
         );
 
         let now = Utc::now().naive_utc();
+        let mut count = 0usize;
         for ev in events {
             if ev.cancelled {
                 self.events_repo
@@ -399,9 +406,10 @@ impl ConnectionsService {
 
             self.events_repo
                 .upsert_from_sync(&conn.user_id, "apple", record)?;
+            count += 1;
         }
 
-        Ok(())
+        Ok(count)
     }
 }
 

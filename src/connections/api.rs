@@ -1,10 +1,11 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::connections::dto::{
     CompleteGoogleRequest, ConnectAppleRequest, ConnectionResponse, ListConnectionsResponse,
-    OAuthInitResponse, TriggerSyncRequest,
+    OAuthInitResponse, TriggerSyncRequest, TriggerSyncResponse,
 };
 use crate::connections::service::ConnectionsService;
 use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::http::header;
 use std::sync::Arc;
 use utoipa::OpenApi;
 
@@ -47,9 +48,9 @@ pub async fn list_connections(
 #[post("/connections/google")]
 pub async fn initiate_google(
     state: web::Data<ConnectionsApiState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
 ) -> Result<web::Json<OAuthInitResponse>, ApiError> {
-    let result = state.connections_service.initiate_google()?;
+    let result = state.connections_service.initiate_google(&user.user_id)?;
     Ok(web::Json(result))
 }
 
@@ -68,26 +69,38 @@ pub struct OAuthCallbackQuery {
         ("state" = Option<String>, Query, description = "State parameter"),
     ),
     responses(
-        (status = 200, description = "Connection established", body = ConnectionResponse),
+        (status = 302, description = "Redirect to /calendar/settings on success"),
         (status = 400, description = "OAuth error"),
     ),
-    security(("bearer_auth" = [])),
     tag = "connections"
 )]
 #[get("/connections/google/callback")]
 pub async fn google_callback(
     state: web::Data<ConnectionsApiState>,
-    user: AuthenticatedUser,
     query: web::Query<OAuthCallbackQuery>,
-) -> Result<web::Json<ConnectionResponse>, ApiError> {
+) -> Result<HttpResponse, ApiError> {
     if let Some(err) = &query.error {
         return Err(ApiError::bad_request(&format!("Google OAuth error: {}", err)));
     }
-    let conn = state
+    let oauth_state = query.state.as_deref().unwrap_or("");
+    let user_id = oauth_state
+        .split(':')
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| ApiError::bad_request("Invalid OAuth state"))?;
+    let user = AuthenticatedUser {
+        user_id: user_id.to_string(),
+        email: String::new(),
+        token: String::new(),
+        is_admin: false,
+    };
+    state
         .connections_service
         .connect_google(&user, &query.code)
         .await?;
-    Ok(web::Json(conn))
+    Ok(HttpResponse::Found()
+        .insert_header((header::LOCATION, "/calendar/settings"))
+        .finish())
 }
 
 /// Authenticated endpoint: the frontend POSTs the authorization code it captured
@@ -226,7 +239,7 @@ pub async fn disconnect_connection(
     path = "/api/v1/sync/trigger",
     request_body = TriggerSyncRequest,
     responses(
-        (status = 202, description = "Sync started"),
+        (status = 200, description = "Sync complete", body = TriggerSyncResponse),
     ),
     security(("bearer_auth" = [])),
     tag = "connections"
@@ -236,12 +249,12 @@ pub async fn trigger_sync(
     state: web::Data<ConnectionsApiState>,
     user: AuthenticatedUser,
     body: web::Json<TriggerSyncRequest>,
-) -> Result<HttpResponse, ApiError> {
-    state
+) -> Result<web::Json<TriggerSyncResponse>, ApiError> {
+    let events_synced = state
         .connections_service
         .trigger_sync(&user, body.into_inner())
         .await?;
-    Ok(HttpResponse::Accepted().finish())
+    Ok(web::Json(TriggerSyncResponse { events_synced }))
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -278,6 +291,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         ListConnectionsResponse,
         OAuthInitResponse,
         TriggerSyncRequest,
+        TriggerSyncResponse,
     )),
     tags((name = "connections", description = "External calendar provider connections")),
     security(("bearer_auth" = []))
