@@ -45,6 +45,15 @@ pub struct OAuthInitResponse {
     pub auth_url: String,
 }
 
+/// Body for the two-step Google OAuth completion endpoint.
+/// The frontend captures the authorization code from the OAuth redirect URL
+/// and POSTs it here with the user's JWT for authenticated token exchange.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteGoogleRequest {
+    pub code: String,
+}
+
 // Keep old name for backwards compat with existing OpenApi references
 pub use ConnectAppleRequest as ConnectRequest;
 pub use ConnectionResponse as ConnectResponse;
