@@ -54,6 +54,12 @@ pub struct CompleteGoogleRequest {
     pub code: String,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerSyncResponse {
+    pub events_synced: usize,
+}
+
 // Keep old name for backwards compat with existing OpenApi references
 pub use ConnectAppleRequest as ConnectRequest;
 pub use ConnectionResponse as ConnectResponse;

@@ -56,10 +56,14 @@ impl EventsRepository {
             .filter(events::user_id.eq(user_id))
             .into_boxed();
         if let Some(f) = from {
-            query = query.filter(events::start_time.ge(f));
+            // Events that end at or after the range start, OR are recurring masters
+            // (recurring masters have their start in the past but generate future occurrences)
+            query = query
+                .filter(events::end_time.ge(f).or(events::recurrence_rule.is_not_null()));
         }
         if let Some(t) = to {
-            query = query.filter(events::end_time.le(t));
+            // Events that start at or before the range end
+            query = query.filter(events::start_time.le(t));
         }
         query
             .order(events::start_time.asc())
