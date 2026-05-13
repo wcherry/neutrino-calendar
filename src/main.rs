@@ -239,23 +239,11 @@ async fn main() -> std::io::Result<()> {
     let token_service_data = web::Data::new(token_service.clone());
     let pool_data = web::Data::new(pool.clone());
     let bind_addr = format!("0.0.0.0:{}", config.port);
-    let cors_allowed_origins = config.cors_allowed_origins.clone();
 
     info!("Listening on {}", bind_addr);
 
     HttpServer::new(move || {
         let openapi = CalendarApiDoc::openapi();
-
-        let cors = cors_allowed_origins.iter().fold(
-            Cors::default()
-                .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-                .allowed_headers(vec![
-                    actix_web::http::header::AUTHORIZATION,
-                    actix_web::http::header::CONTENT_TYPE,
-                ])
-                .max_age(3600),
-            |cors, origin| cors.allowed_origin(origin),
-        );
 
         App::new()
             .app_data(pool_data.clone())
@@ -266,7 +254,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(tasks_state.clone())
             .app_data(token_service_data.clone())
             .wrap(Logger::default())
-            .wrap(cors)
+            .wrap(Cors::permissive())
             .service(health)
             .service(
                 web::scope("/api/v1")

@@ -9,7 +9,6 @@ pub struct Config {
     pub log_level: String,
     pub log_path: Option<String>,
     pub oauth: OAuthConfig,
-    pub cors_allowed_origins: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,13 +57,6 @@ impl Config {
                 .unwrap_or_else(|_| format!("{}/api/v1/connections/outlook/callback", default_base)),
         };
 
-        let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
-            .unwrap_or_default()
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
         Ok(Config {
             database_url,
             port,
@@ -72,7 +64,6 @@ impl Config {
             log_level,
             log_path,
             oauth,
-            cors_allowed_origins,
         })
     }
 }
