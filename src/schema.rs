@@ -67,3 +67,29 @@ diesel::table! {
         caldav_url -> Nullable<Text>,
     }
 }
+
+diesel::table! {
+    task_lists (id) {
+        id -> Text,
+        user_id -> Text,
+        name -> Text,
+        color -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tasks (id) {
+        id -> Text,
+        list_id -> Text,
+        user_id -> Text,
+        title -> Text,
+        notes -> Nullable<Text>,
+        done -> Bool,
+        due_date -> Nullable<Timestamp>,
+        position -> Integer,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
