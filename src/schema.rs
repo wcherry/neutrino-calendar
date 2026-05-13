@@ -67,3 +67,44 @@ diesel::table! {
         caldav_url -> Nullable<Text>,
     }
 }
+
+diesel::table! {
+    task_lists (id) {
+        id -> Text,
+        user_id -> Text,
+        name -> Text,
+        color -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tasks (id) {
+        id -> Text,
+        user_id -> Text,
+        title -> Text,
+        notes -> Nullable<Text>,
+        done -> Bool,
+        due_date -> Nullable<Timestamp>,
+        position -> Integer,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    task_list_memberships (task_id, list_id) {
+        task_id -> Text,
+        list_id -> Text,
+    }
+}
+
+diesel::joinable!(task_list_memberships -> tasks (task_id));
+diesel::joinable!(task_list_memberships -> task_lists (list_id));
+
+diesel::allow_tables_to_appear_in_same_query!(
+    task_list_memberships,
+    tasks,
+    task_lists,
+);

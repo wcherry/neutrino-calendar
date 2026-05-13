@@ -18,6 +18,7 @@ mod events;
 mod reminder_engine;
 mod reminders;
 mod schema;
+mod tasks;
 
 use crate::attachments::api::AttachmentsApiState;
 use crate::attachments::repository::AttachmentsRepository;
@@ -34,6 +35,9 @@ use crate::connections::service::ConnectionsService;
 use crate::reminders::api::RemindersApiState;
 use crate::reminders::repository::RemindersRepository;
 use crate::reminders::service::RemindersService;
+use crate::tasks::api::TasksApiState;
+use crate::tasks::repository::TasksRepository;
+use crate::tasks::service::TasksService;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -89,6 +93,10 @@ use crate::connections::dto::{
 };
 use crate::events::dto::{CreateEventRequest, EventResponse, ListEventsQuery, ListEventsResponse, UpdateEventRequest};
 use crate::reminders::dto::{CreateReminderRequest, ListRemindersResponse, ReminderResponse, UpdateReminderRequest};
+use crate::tasks::dto::{
+    CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksResponse,
+    TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
+};
 
 struct SecurityAddon;
 
@@ -130,6 +138,18 @@ impl Modify for SecurityAddon {
         connections::api::connect_apple,
         connections::api::disconnect_connection,
         connections::api::trigger_sync,
+        tasks::api::list_task_lists,
+        tasks::api::create_task_list,
+        tasks::api::get_task_list,
+        tasks::api::update_task_list,
+        tasks::api::delete_task_list,
+        tasks::api::list_tasks,
+        tasks::api::create_task,
+        tasks::api::get_task,
+        tasks::api::update_task,
+        tasks::api::delete_task,
+        tasks::api::add_task_to_list,
+        tasks::api::remove_task_from_list,
     ),
     components(
         schemas(
@@ -140,6 +160,10 @@ impl Modify for SecurityAddon {
             CreateAttachmentRequest, AttachmentResponse, ListAttachmentsResponse,
             ConnectRequest, ConnectResponse,
             ListConnectionsResponse, OAuthInitResponse, TriggerSyncRequest,
+            CreateTaskListRequest, UpdateTaskListRequest,
+            TaskListResponse, ListTaskListsResponse,
+            CreateTaskRequest, UpdateTaskRequest,
+            TaskResponse, ListTasksResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -148,6 +172,7 @@ impl Modify for SecurityAddon {
         (name = "reminders",   description = "Reminders and tasks"),
         (name = "attachments", description = "Event attachments and notes"),
         (name = "connections", description = "External calendar provider connections"),
+        (name = "tasks",       description = "Task lists and tasks"),
     ),
     security(("bearer_auth" = []))
 )]
@@ -201,6 +226,10 @@ async fn main() -> std::io::Result<()> {
     ));
     let connections_state = web::Data::new(ConnectionsApiState { connections_service });
 
+    let tasks_repo = Arc::new(TasksRepository::new(pool.clone()));
+    let tasks_service = Arc::new(TasksService::new(tasks_repo));
+    let tasks_state = web::Data::new(TasksApiState { tasks_service });
+
     // Phase 4: spawn reminder engine background worker
     let engine_repo = reminders_repo.clone();
     tokio::spawn(async move {
@@ -222,6 +251,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(reminders_state.clone())
             .app_data(attachments_state.clone())
             .app_data(connections_state.clone())
+            .app_data(tasks_state.clone())
             .app_data(token_service_data.clone())
             .wrap(Logger::default())
             .wrap(Cors::permissive())
@@ -231,7 +261,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(events::api::configure)
                     .configure(reminders::api::configure)
                     .configure(attachments::api::configure)
-                    .configure(connections::api::configure),
+                    .configure(connections::api::configure)
+                    .configure(tasks::api::configure),
             )
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
