@@ -1,8 +1,8 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::tasks::{
     dto::{
-        CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksResponse,
-        TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
+        CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksQuery,
+        ListTasksResponse, TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
     },
     service::TasksService,
 };
@@ -132,60 +132,54 @@ pub async fn delete_task_list(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/task-lists/{list_id}/tasks",
-    params(("list_id" = String, Path, description = "Task list ID")),
+    path = "/api/v1/tasks",
+    params(ListTasksQuery),
     responses(
         (status = 200, description = "List of tasks", body = ListTasksResponse),
-        (status = 404, description = "List not found"),
+        (status = 404, description = "List not found (when list_id provided)"),
     ),
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[get("/task-lists/{list_id}/tasks")]
+#[get("/tasks")]
 pub async fn list_tasks(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
-    path: web::Path<String>,
+    query: web::Query<ListTasksQuery>,
 ) -> Result<web::Json<ListTasksResponse>, ApiError> {
     let result = state
         .tasks_service
-        .list_tasks(&user, &path.into_inner())?;
+        .list_tasks(&user, query.list_id.as_deref())?;
     Ok(web::Json(result))
 }
 
 #[utoipa::path(
     post,
-    path = "/api/v1/task-lists/{list_id}/tasks",
-    params(("list_id" = String, Path, description = "Task list ID")),
+    path = "/api/v1/tasks",
     request_body = CreateTaskRequest,
     responses(
         (status = 201, description = "Task created", body = TaskResponse),
         (status = 400, description = "Invalid request"),
-        (status = 404, description = "List not found"),
     ),
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[post("/task-lists/{list_id}/tasks")]
+#[post("/tasks")]
 pub async fn create_task(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
-    path: web::Path<String>,
     body: web::Json<CreateTaskRequest>,
 ) -> Result<HttpResponse, ApiError> {
     let task = state
         .tasks_service
-        .create_task(&user, &path.into_inner(), body.into_inner())?;
+        .create_task(&user, body.into_inner())?;
     Ok(HttpResponse::Created().json(task))
 }
 
 #[utoipa::path(
     get,
-    path = "/api/v1/task-lists/{list_id}/tasks/{id}",
-    params(
-        ("list_id" = String, Path, description = "Task list ID"),
-        ("id" = String, Path, description = "Task ID"),
-    ),
+    path = "/api/v1/tasks/{id}",
+    params(("id" = String, Path, description = "Task ID")),
     responses(
         (status = 200, description = "Task", body = TaskResponse),
         (status = 404, description = "Not found"),
@@ -193,24 +187,20 @@ pub async fn create_task(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[get("/task-lists/{list_id}/tasks/{id}")]
+#[get("/tasks/{id}")]
 pub async fn get_task(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
 ) -> Result<web::Json<TaskResponse>, ApiError> {
-    let (list_id, task_id) = path.into_inner();
-    let task = state.tasks_service.get_task(&user, &list_id, &task_id)?;
+    let task = state.tasks_service.get_task(&user, &path.into_inner())?;
     Ok(web::Json(task))
 }
 
 #[utoipa::path(
     patch,
-    path = "/api/v1/task-lists/{list_id}/tasks/{id}",
-    params(
-        ("list_id" = String, Path, description = "Task list ID"),
-        ("id" = String, Path, description = "Task ID"),
-    ),
+    path = "/api/v1/tasks/{id}",
+    params(("id" = String, Path, description = "Task ID")),
     request_body = UpdateTaskRequest,
     responses(
         (status = 200, description = "Task updated", body = TaskResponse),
@@ -219,27 +209,23 @@ pub async fn get_task(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[patch("/task-lists/{list_id}/tasks/{id}")]
+#[patch("/tasks/{id}")]
 pub async fn update_task(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
     body: web::Json<UpdateTaskRequest>,
 ) -> Result<web::Json<TaskResponse>, ApiError> {
-    let (list_id, task_id) = path.into_inner();
     let task = state
         .tasks_service
-        .update_task(&user, &list_id, &task_id, body.into_inner())?;
+        .update_task(&user, &path.into_inner(), body.into_inner())?;
     Ok(web::Json(task))
 }
 
 #[utoipa::path(
     delete,
-    path = "/api/v1/task-lists/{list_id}/tasks/{id}",
-    params(
-        ("list_id" = String, Path, description = "Task list ID"),
-        ("id" = String, Path, description = "Task ID"),
-    ),
+    path = "/api/v1/tasks/{id}",
+    params(("id" = String, Path, description = "Task ID")),
     responses(
         (status = 204, description = "Task deleted"),
         (status = 404, description = "Not found"),
@@ -247,14 +233,69 @@ pub async fn update_task(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[delete("/task-lists/{list_id}/tasks/{id}")]
+#[delete("/tasks/{id}")]
 pub async fn delete_task(
+    state: web::Data<TasksApiState>,
+    user: AuthenticatedUser,
+    path: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    state.tasks_service.delete_task(&user, &path.into_inner())?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// ── List Membership ───────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/tasks/{id}/lists/{list_id}",
+    params(
+        ("id" = String, Path, description = "Task ID"),
+        ("list_id" = String, Path, description = "Task list ID"),
+    ),
+    responses(
+        (status = 204, description = "Task added to list"),
+        (status = 404, description = "Task or list not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "tasks"
+)]
+#[post("/tasks/{id}/lists/{list_id}")]
+pub async fn add_task_to_list(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let (list_id, task_id) = path.into_inner();
-    state.tasks_service.delete_task(&user, &list_id, &task_id)?;
+    let (task_id, list_id) = path.into_inner();
+    state
+        .tasks_service
+        .add_task_to_list(&user, &task_id, &list_id)?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/tasks/{id}/lists/{list_id}",
+    params(
+        ("id" = String, Path, description = "Task ID"),
+        ("list_id" = String, Path, description = "Task list ID"),
+    ),
+    responses(
+        (status = 204, description = "Task removed from list"),
+        (status = 404, description = "Task, list, or membership not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "tasks"
+)]
+#[delete("/tasks/{id}/lists/{list_id}")]
+pub async fn remove_task_from_list(
+    state: web::Data<TasksApiState>,
+    user: AuthenticatedUser,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let (task_id, list_id) = path.into_inner();
+    state
+        .tasks_service
+        .remove_task_from_list(&user, &task_id, &list_id)?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -268,7 +309,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(create_task)
         .service(get_task)
         .service(update_task)
-        .service(delete_task);
+        .service(delete_task)
+        .service(add_task_to_list)
+        .service(remove_task_from_list);
 }
 
 #[derive(OpenApi)]
@@ -284,6 +327,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         get_task,
         update_task,
         delete_task,
+        add_task_to_list,
+        remove_task_from_list,
     ),
     components(schemas(
         CreateTaskListRequest,

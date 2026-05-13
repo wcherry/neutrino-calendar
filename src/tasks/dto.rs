@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 // ── Task List Request types ───────────────────────────────────────────────────
 
@@ -56,13 +56,20 @@ pub struct UpdateTaskRequest {
     pub position: Option<i32>,
 }
 
+// ── Task Query types ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ListTasksQuery {
+    pub list_id: Option<String>,
+}
+
 // ── Task Response types ───────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
     pub id: String,
-    pub list_id: String,
     pub title: String,
     pub notes: Option<String>,
     pub done: bool,

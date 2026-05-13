@@ -82,7 +82,6 @@ diesel::table! {
 diesel::table! {
     tasks (id) {
         id -> Text,
-        list_id -> Text,
         user_id -> Text,
         title -> Text,
         notes -> Nullable<Text>,
@@ -93,3 +92,19 @@ diesel::table! {
         updated_at -> Timestamp,
     }
 }
+
+diesel::table! {
+    task_list_memberships (task_id, list_id) {
+        task_id -> Text,
+        list_id -> Text,
+    }
+}
+
+diesel::joinable!(task_list_memberships -> tasks (task_id));
+diesel::joinable!(task_list_memberships -> task_lists (list_id));
+
+diesel::allow_tables_to_appear_in_same_query!(
+    task_list_memberships,
+    tasks,
+    task_lists,
+);

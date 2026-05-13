@@ -5,7 +5,8 @@ use crate::tasks::{
         TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
     },
     model::{
-        NewTaskListRecord, NewTaskRecord, UpdateTaskListRecord, UpdateTaskRecord,
+        NewTaskListMembershipRecord, NewTaskListRecord, NewTaskRecord, UpdateTaskListRecord,
+        UpdateTaskRecord,
     },
     repository::TasksRepository,
 };
@@ -80,10 +81,10 @@ impl TasksService {
         user: &AuthenticatedUser,
         list_id: &str,
     ) -> Result<(), ApiError> {
-        // Verify the list belongs to the user before cascading tasks
+        // Verify the list belongs to the user
         self.repo.find_by_id(list_id, &user.user_id)?;
-        // Delete tasks first (SQLite doesn't enforce FK cascades by default)
-        self.repo.delete_tasks_by_list(list_id, &user.user_id)?;
+        // Remove all memberships pointing to this list (tasks themselves are preserved)
+        self.repo.delete_memberships_by_list(list_id)?;
         self.repo.delete(list_id, &user.user_id)
     }
 
@@ -92,11 +93,16 @@ impl TasksService {
     pub fn list_tasks(
         &self,
         user: &AuthenticatedUser,
-        list_id: &str,
+        list_id: Option<&str>,
     ) -> Result<ListTasksResponse, ApiError> {
-        // Verify the list belongs to the user
-        self.repo.find_by_id(list_id, &user.user_id)?;
-        let records = self.repo.find_tasks_by_list(&user.user_id, list_id)?;
+        let records = match list_id {
+            Some(lid) => {
+                // Verify the list belongs to the user
+                self.repo.find_by_id(lid, &user.user_id)?;
+                self.repo.find_tasks_by_list_id(&user.user_id, lid)?
+            }
+            None => self.repo.find_all_tasks_by_user(&user.user_id)?,
+        };
         let tasks = records.into_iter().map(task_to_response).collect();
         Ok(ListTasksResponse { tasks })
     }
@@ -104,15 +110,11 @@ impl TasksService {
     pub fn create_task(
         &self,
         user: &AuthenticatedUser,
-        list_id: &str,
         req: CreateTaskRequest,
     ) -> Result<TaskResponse, ApiError> {
-        // Verify the list belongs to the user
-        self.repo.find_by_id(list_id, &user.user_id)?;
         let now = Utc::now().naive_utc();
         let record = NewTaskRecord {
             id: Uuid::new_v4().to_string(),
-            list_id: list_id.to_string(),
             user_id: user.user_id.clone(),
             title: req.title,
             notes: req.notes,
@@ -129,17 +131,15 @@ impl TasksService {
     pub fn get_task(
         &self,
         user: &AuthenticatedUser,
-        list_id: &str,
         task_id: &str,
     ) -> Result<TaskResponse, ApiError> {
-        let record = self.repo.find_task_by_id(task_id, list_id, &user.user_id)?;
+        let record = self.repo.find_task_by_id(task_id, &user.user_id)?;
         Ok(task_to_response(record))
     }
 
     pub fn update_task(
         &self,
         user: &AuthenticatedUser,
-        list_id: &str,
         task_id: &str,
         req: UpdateTaskRequest,
     ) -> Result<TaskResponse, ApiError> {
@@ -151,17 +151,50 @@ impl TasksService {
             position: req.position,
             updated_at: Utc::now().naive_utc(),
         };
-        let updated = self.repo.update_task(task_id, list_id, &user.user_id, changes)?;
+        let updated = self.repo.update_task(task_id, &user.user_id, changes)?;
         Ok(task_to_response(updated))
     }
 
     pub fn delete_task(
         &self,
         user: &AuthenticatedUser,
-        list_id: &str,
         task_id: &str,
     ) -> Result<(), ApiError> {
-        self.repo.delete_task(task_id, list_id, &user.user_id)
+        self.repo.delete_task(task_id, &user.user_id)
+    }
+
+    // ── List Membership ───────────────────────────────────────────────────────
+
+    pub fn add_task_to_list(
+        &self,
+        user: &AuthenticatedUser,
+        task_id: &str,
+        list_id: &str,
+    ) -> Result<(), ApiError> {
+        // Verify ownership of both task and list
+        self.repo.find_task_by_id(task_id, &user.user_id)?;
+        self.repo.find_by_id(list_id, &user.user_id)?;
+        // Idempotent: if membership already exists, succeed silently
+        if self.repo.membership_exists(task_id, list_id)? {
+            return Ok(());
+        }
+        self.repo.insert_membership(NewTaskListMembershipRecord {
+            task_id: task_id.to_string(),
+            list_id: list_id.to_string(),
+        })?;
+        Ok(())
+    }
+
+    pub fn remove_task_from_list(
+        &self,
+        user: &AuthenticatedUser,
+        task_id: &str,
+        list_id: &str,
+    ) -> Result<(), ApiError> {
+        // Verify ownership of both task and list
+        self.repo.find_task_by_id(task_id, &user.user_id)?;
+        self.repo.find_by_id(list_id, &user.user_id)?;
+        self.repo.delete_membership(task_id, list_id)
     }
 }
 
@@ -185,7 +218,6 @@ fn task_list_to_response(r: crate::tasks::model::TaskListRecord) -> TaskListResp
 fn task_to_response(r: crate::tasks::model::TaskRecord) -> TaskResponse {
     TaskResponse {
         id: r.id,
-        list_id: r.list_id,
         title: r.title,
         notes: r.notes,
         done: r.done,

@@ -43,7 +43,6 @@ pub struct UpdateTaskListRecord {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct TaskRecord {
     pub id: String,
-    pub list_id: String,
     pub user_id: String,
     pub title: String,
     pub notes: Option<String>,
@@ -58,7 +57,6 @@ pub struct TaskRecord {
 #[diesel(table_name = crate::schema::tasks)]
 pub struct NewTaskRecord {
     pub id: String,
-    pub list_id: String,
     pub user_id: String,
     pub title: String,
     pub notes: Option<String>,
@@ -78,4 +76,22 @@ pub struct UpdateTaskRecord {
     pub due_date: Option<Option<NaiveDateTime>>,
     pub position: Option<i32>,
     pub updated_at: NaiveDateTime,
+}
+
+// ── Task List Memberships ─────────────────────────────────────────────────────
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = crate::schema::task_list_memberships)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct TaskListMembershipRecord {
+    pub task_id: String,
+    pub list_id: String,
+}
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = crate::schema::task_list_memberships)]
+pub struct NewTaskListMembershipRecord {
+    pub task_id: String,
+    pub list_id: String,
 }

@@ -148,6 +148,8 @@ impl Modify for SecurityAddon {
         tasks::api::get_task,
         tasks::api::update_task,
         tasks::api::delete_task,
+        tasks::api::add_task_to_list,
+        tasks::api::remove_task_from_list,
     ),
     components(
         schemas(
