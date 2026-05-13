@@ -61,6 +61,7 @@ pub struct UpdateTaskRequest {
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTasksQuery {
+    #[param(required = false)]
     pub list_id: Option<String>,
 }
 
