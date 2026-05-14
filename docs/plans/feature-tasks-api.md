@@ -55,20 +55,20 @@ Index: `(user_id, list_id)`, `(list_id, position)`
 ### Lists
 | Method | Path | Description |
 |---|---|---|
-| GET | /api/v1/task-lists | List all lists for authenticated user |
-| POST | /api/v1/task-lists | Create a list |
-| GET | /api/v1/task-lists/{id} | Get a single list |
-| PATCH | /api/v1/task-lists/{id} | Update name/color |
-| DELETE | /api/v1/task-lists/{id} | Delete list (cascades tasks in app layer) |
+| GET | /api/v1/tasks/lists | List all lists for authenticated user |
+| POST | /api/v1/tasks/lists | Create a list |
+| GET | /api/v1/tasks/lists/{id} | Get a single list |
+| PATCH | /api/v1/tasks/lists/{id} | Update name/color |
+| DELETE | /api/v1/tasks/lists/{id} | Delete list (cascades tasks in app layer) |
 
 ### Tasks
 | Method | Path | Description |
 |---|---|---|
-| GET | /api/v1/task-lists/{list_id}/tasks | List tasks in a list |
-| POST | /api/v1/task-lists/{list_id}/tasks | Create a task |
-| GET | /api/v1/task-lists/{list_id}/tasks/{id} | Get a single task |
-| PATCH | /api/v1/task-lists/{list_id}/tasks/{id} | Update task fields |
-| DELETE | /api/v1/task-lists/{list_id}/tasks/{id} | Delete a task |
+| GET | /api/v1/tasks/lists/{list_id}/tasks | List tasks in a list |
+| POST | /api/v1/tasks/lists/{list_id}/tasks | Create a task |
+| GET | /api/v1/tasks/lists/{list_id}/tasks/{id} | Get a single task |
+| PATCH | /api/v1/tasks/lists/{list_id}/tasks/{id} | Update task fields |
+| DELETE | /api/v1/tasks/lists/{list_id}/tasks/{id} | Delete a task |
 
 ## Specialist Agents
 - `rust-developer`: all implementation (migrations, schema, model, dto, repository, service, api, main.rs wiring)

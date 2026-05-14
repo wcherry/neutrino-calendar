@@ -11,7 +11,7 @@
 
 1. Create a list:
    ```
-   curl -s -X POST $BASE/task-lists \
+   curl -s -X POST $BASE/tasks/lists \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"name":"Shopping","color":"#ff0000"}' | jq .
@@ -20,19 +20,19 @@
 
 2. List all lists:
    ```
-   curl -s $BASE/task-lists -H "Authorization: Bearer $TOKEN" | jq .
+   curl -s $BASE/tasks/lists -H "Authorization: Bearer $TOKEN" | jq .
    ```
    Expected: 200, `taskLists` array contains the list created above.
 
 3. Get by ID:
    ```
-   curl -s $BASE/task-lists/<id> -H "Authorization: Bearer $TOKEN" | jq .
+   curl -s $BASE/tasks/lists/<id> -H "Authorization: Bearer $TOKEN" | jq .
    ```
    Expected: 200, full list object.
 
 4. Update name:
    ```
-   curl -s -X PATCH $BASE/task-lists/<id> \
+   curl -s -X PATCH $BASE/tasks/lists/<id> \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"name":"Grocery"}' | jq .
@@ -43,7 +43,7 @@
 
 5. Create a task:
    ```
-   curl -s -X POST $BASE/task-lists/<list_id>/tasks \
+   curl -s -X POST $BASE/tasks/lists/<list_id>/tasks \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"title":"Buy milk","notes":"2% please","dueDate":"2026-06-01T09:00:00Z"}' | jq .
@@ -52,13 +52,13 @@
 
 6. List tasks:
    ```
-   curl -s $BASE/task-lists/<list_id>/tasks -H "Authorization: Bearer $TOKEN" | jq .
+   curl -s $BASE/tasks/lists/<list_id>/tasks -H "Authorization: Bearer $TOKEN" | jq .
    ```
    Expected: 200, `tasks` array contains the task.
 
 7. Mark task done:
    ```
-   curl -s -X PATCH $BASE/task-lists/<list_id>/tasks/<task_id> \
+   curl -s -X PATCH $BASE/tasks/lists/<list_id>/tasks/<task_id> \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"done":true}' | jq .
@@ -67,7 +67,7 @@
 
 8. Delete a task:
    ```
-   curl -s -X DELETE $BASE/task-lists/<list_id>/tasks/<task_id> \
+   curl -s -X DELETE $BASE/tasks/lists/<list_id>/tasks/<task_id> \
      -H "Authorization: Bearer $TOKEN"
    ```
    Expected: 204 No Content.
@@ -76,15 +76,15 @@
 
 9. Create a new list with 2 tasks, then delete the list:
    ```
-   curl -s -X DELETE $BASE/task-lists/<list_id> -H "Authorization: Bearer $TOKEN"
+   curl -s -X DELETE $BASE/tasks/lists/<list_id> -H "Authorization: Bearer $TOKEN"
    ```
-   Expected: 204. Verify that `GET $BASE/task-lists/<list_id>/tasks` returns 404.
+   Expected: 204. Verify that `GET $BASE/tasks/lists/<list_id>/tasks` returns 404.
 
 ### Edge Cases
 
 10. Get a non-existent list:
     ```
-    curl -s $BASE/task-lists/does-not-exist -H "Authorization: Bearer $TOKEN"
+    curl -s $BASE/tasks/lists/does-not-exist -H "Authorization: Bearer $TOKEN"
     ```
     Expected: 404 with error body.
 

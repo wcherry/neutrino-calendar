@@ -18,14 +18,14 @@ pub struct TasksApiState {
 
 #[utoipa::path(
     get,
-    path = "/api/v1/task-lists",
+    path = "/api/v1/tasks/lists",
     responses(
         (status = 200, description = "List of task lists", body = ListTaskListsResponse),
     ),
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[get("/task-lists")]
+#[get("/tasks/lists")]
 pub async fn list_task_lists(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
@@ -36,7 +36,7 @@ pub async fn list_task_lists(
 
 #[utoipa::path(
     post,
-    path = "/api/v1/task-lists",
+    path = "/api/v1/tasks/lists",
     request_body = CreateTaskListRequest,
     responses(
         (status = 201, description = "Task list created", body = TaskListResponse),
@@ -45,7 +45,7 @@ pub async fn list_task_lists(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[post("/task-lists")]
+#[post("/tasks/lists")]
 pub async fn create_task_list(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
@@ -59,7 +59,7 @@ pub async fn create_task_list(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/task-lists/{id}",
+    path = "/api/v1/tasks/lists/{id}",
     params(("id" = String, Path, description = "Task list ID")),
     responses(
         (status = 200, description = "Task list", body = TaskListResponse),
@@ -68,7 +68,7 @@ pub async fn create_task_list(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[get("/task-lists/{id}")]
+#[get("/tasks/lists/{id}")]
 pub async fn get_task_list(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
@@ -82,7 +82,7 @@ pub async fn get_task_list(
 
 #[utoipa::path(
     patch,
-    path = "/api/v1/task-lists/{id}",
+    path = "/api/v1/tasks/lists/{id}",
     params(("id" = String, Path, description = "Task list ID")),
     request_body = UpdateTaskListRequest,
     responses(
@@ -92,7 +92,7 @@ pub async fn get_task_list(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[patch("/task-lists/{id}")]
+#[patch("/tasks/lists/{id}")]
 pub async fn update_task_list(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
@@ -107,7 +107,7 @@ pub async fn update_task_list(
 
 #[utoipa::path(
     delete,
-    path = "/api/v1/task-lists/{id}",
+    path = "/api/v1/tasks/lists/{id}",
     params(("id" = String, Path, description = "Task list ID")),
     responses(
         (status = 204, description = "Task list deleted"),
@@ -116,7 +116,7 @@ pub async fn update_task_list(
     security(("bearer_auth" = [])),
     tag = "tasks"
 )]
-#[delete("/task-lists/{id}")]
+#[delete("/tasks/lists/{id}")]
 pub async fn delete_task_list(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
