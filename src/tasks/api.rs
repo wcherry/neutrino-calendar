@@ -2,7 +2,8 @@ use crate::common::{ApiError, AuthenticatedUser};
 use crate::tasks::{
     dto::{
         CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksQuery,
-        ListTasksResponse, TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
+        ListTasksResponse, ReorderTasksRequest, TaskListResponse, TaskResponse,
+        UpdateTaskListRequest, UpdateTaskRequest,
     },
     service::TasksService,
 };
@@ -243,6 +244,32 @@ pub async fn delete_task(
     Ok(HttpResponse::NoContent().finish())
 }
 
+// ── Reorder ───────────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/tasks/reorder",
+    request_body = ReorderTasksRequest,
+    responses(
+        (status = 200, description = "Tasks reordered successfully"),
+        (status = 400, description = "Invalid request or task not in list"),
+        (status = 404, description = "List not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "tasks"
+)]
+#[post("/tasks/reorder")]
+pub async fn reorder_tasks(
+    state: web::Data<TasksApiState>,
+    user: AuthenticatedUser,
+    body: web::Json<ReorderTasksRequest>,
+) -> Result<HttpResponse, ApiError> {
+    state
+        .tasks_service
+        .reorder_tasks(&user, body.into_inner())?;
+    Ok(HttpResponse::Ok().finish())
+}
+
 // ── List Membership ───────────────────────────────────────────────────────────
 
 #[utoipa::path(
@@ -310,6 +337,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(get_task)
         .service(update_task)
         .service(delete_task)
+        .service(reorder_tasks)
         .service(add_task_to_list)
         .service(remove_task_from_list);
 }
@@ -327,6 +355,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         get_task,
         update_task,
         delete_task,
+        reorder_tasks,
         add_task_to_list,
         remove_task_from_list,
     ),
@@ -337,6 +366,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         ListTaskListsResponse,
         CreateTaskRequest,
         UpdateTaskRequest,
+        ReorderTasksRequest,
         TaskResponse,
         ListTasksResponse,
     )),

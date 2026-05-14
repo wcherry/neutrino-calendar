@@ -2,7 +2,7 @@ use crate::common::{ApiError, AuthenticatedUser};
 use crate::tasks::{
     dto::{
         CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksResponse,
-        TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
+        ReorderTasksRequest, TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
     },
     model::{
         NewTaskListMembershipRecord, NewTaskListRecord, NewTaskRecord, UpdateTaskListRecord,
@@ -161,6 +161,38 @@ impl TasksService {
         task_id: &str,
     ) -> Result<(), ApiError> {
         self.repo.delete_task(task_id, &user.user_id)
+    }
+
+    pub fn reorder_tasks(
+        &self,
+        user: &AuthenticatedUser,
+        req: ReorderTasksRequest,
+    ) -> Result<(), ApiError> {
+        // Verify the list belongs to the user
+        self.repo.find_by_id(&req.list_id, &user.user_id)?;
+
+        // Verify all requested task IDs belong to this list
+        let list_tasks = self.repo.find_tasks_by_list_id(&user.user_id, &req.list_id)?;
+        let list_task_ids: std::collections::HashSet<&str> =
+            list_tasks.iter().map(|t| t.id.as_str()).collect();
+        for task_id in &req.task_ids {
+            if !list_task_ids.contains(task_id.as_str()) {
+                return Err(ApiError::bad_request(&format!(
+                    "Task {} is not in list {}",
+                    task_id, req.list_id
+                )));
+            }
+        }
+
+        let now = Utc::now().naive_utc();
+        let updates: Vec<(String, i32)> = req
+            .task_ids
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| (id, i as i32))
+            .collect();
+
+        self.repo.bulk_update_positions(&user.user_id, &updates, now)
     }
 
     // ── List Membership ───────────────────────────────────────────────────────

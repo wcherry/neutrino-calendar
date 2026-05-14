@@ -65,6 +65,17 @@ pub struct ListTasksQuery {
     pub list_id: Option<String>,
 }
 
+// ── Reorder Request ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderTasksRequest {
+    /// The list whose tasks are being reordered.
+    pub list_id: String,
+    /// Task IDs in the desired new order (position 0 = first element).
+    pub task_ids: Vec<String>,
+}
+
 // ── Task Response types ───────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, ToSchema)]

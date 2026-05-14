@@ -228,6 +228,30 @@ impl TasksRepository {
             })
     }
 
+    pub fn bulk_update_positions(
+        &self,
+        user_id: &str,
+        updates: &[(String, i32)],
+        now: chrono::NaiveDateTime,
+    ) -> Result<(), ApiError> {
+        let mut conn = self.get_conn()?;
+        conn.transaction::<(), diesel::result::Error, _>(|conn| {
+            for (id, pos) in updates {
+                diesel::update(
+                    tasks::table
+                        .filter(tasks::id.eq(id).and(tasks::user_id.eq(user_id))),
+                )
+                .set((tasks::position.eq(pos), tasks::updated_at.eq(now)))
+                .execute(conn)?;
+            }
+            Ok(())
+        })
+        .map_err(|e| {
+            tracing::error!("DB bulk_update_positions error: {:?}", e);
+            ApiError::internal("Database error")
+        })
+    }
+
     pub fn delete_task(&self, id: &str, user_id: &str) -> Result<(), ApiError> {
         let mut conn = self.get_conn()?;
         let affected = diesel::delete(
