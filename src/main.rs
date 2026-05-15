@@ -1,4 +1,4 @@
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, middleware::Logger};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, middleware::{Logger, NormalizePath, TrailingSlash}};
 use actix_cors::Cors;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -253,6 +253,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(connections_state.clone())
             .app_data(tasks_state.clone())
             .app_data(token_service_data.clone())
+            .wrap(NormalizePath::new(TrailingSlash::Trim))
             .wrap(Logger::default())
             .wrap(Cors::permissive())
             .service(health)
