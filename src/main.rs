@@ -94,7 +94,7 @@ use crate::connections::dto::{
 use crate::events::dto::{CreateEventRequest, EventResponse, ListEventsQuery, ListEventsResponse, UpdateEventRequest};
 use crate::reminders::dto::{CreateReminderRequest, ListRemindersResponse, ReminderResponse, UpdateReminderRequest};
 use crate::tasks::dto::{
-    CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksResponse,
+    CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse,
     TaskListResponse, TaskResponse, UpdateTaskListRequest, UpdateTaskRequest,
 };
 
@@ -163,7 +163,7 @@ impl Modify for SecurityAddon {
             CreateTaskListRequest, UpdateTaskListRequest,
             TaskListResponse, ListTaskListsResponse,
             CreateTaskRequest, UpdateTaskRequest,
-            TaskResponse, ListTasksResponse,
+            TaskResponse,
         )
     ),
     modifiers(&SecurityAddon),

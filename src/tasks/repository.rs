@@ -228,6 +228,32 @@ impl TasksRepository {
             })
     }
 
+    pub fn bulk_insert_tasks_with_memberships(
+        &self,
+        task_records: Vec<NewTaskRecord>,
+        membership_records: Vec<NewTaskListMembershipRecord>,
+    ) -> Result<Vec<TaskRecord>, ApiError> {
+        let ids: Vec<String> = task_records.iter().map(|r| r.id.clone()).collect();
+        let mut conn = self.get_conn()?;
+        conn.transaction::<Vec<TaskRecord>, diesel::result::Error, _>(|conn| {
+            diesel::insert_into(tasks::table)
+                .values(&task_records)
+                .execute(conn)?;
+            diesel::insert_into(task_list_memberships::table)
+                .values(&membership_records)
+                .execute(conn)?;
+            tasks::table
+                .filter(tasks::id.eq_any(&ids))
+                .order((tasks::position.asc(), tasks::created_at.asc()))
+                .select(TaskRecord::as_select())
+                .load(conn)
+        })
+        .map_err(|e| {
+            tracing::error!("DB bulk_insert_tasks_with_memberships error: {:?}", e);
+            ApiError::internal("Database error")
+        })
+    }
+
     pub fn bulk_update_positions(
         &self,
         user_id: &str,
