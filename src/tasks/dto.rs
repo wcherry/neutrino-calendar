@@ -48,6 +48,22 @@ pub struct CreateTaskRequest {
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct BulkCreateTaskItem {
+    pub title: String,
+    pub notes: Option<String>,
+    pub due_date: Option<String>, // ISO 8601 UTC
+}
+
+/// Up to 200 tasks to create atomically, all added to the given list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateTasksRequest {
+    pub list_id: String,
+    pub tasks: Vec<BulkCreateTaskItem>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateTaskRequest {
     pub title: Option<String>,
     pub notes: Option<String>,
@@ -93,6 +109,6 @@ pub struct TaskResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ListTasksResponse {
+pub struct BulkCreateTasksResponse {
     pub tasks: Vec<TaskResponse>,
 }

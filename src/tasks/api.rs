@@ -1,8 +1,9 @@
 use crate::common::{ApiError, AuthenticatedUser};
 use crate::tasks::{
     dto::{
+        BulkCreateTaskItem, BulkCreateTasksRequest, BulkCreateTasksResponse,
         CreateTaskListRequest, CreateTaskRequest, ListTaskListsResponse, ListTasksQuery,
-        ListTasksResponse, ReorderTasksRequest, TaskListResponse, TaskResponse,
+        ReorderTasksRequest, TaskListResponse, TaskResponse,
         UpdateTaskListRequest, UpdateTaskRequest,
     },
     service::TasksService,
@@ -136,7 +137,7 @@ pub async fn delete_task_list(
     path = "/api/v1/tasks",
     params(ListTasksQuery),
     responses(
-        (status = 200, description = "List of tasks", body = ListTasksResponse),
+        (status = 200, description = "List of tasks", body = Vec<TaskResponse>),
         (status = 404, description = "List not found (when list_id provided)"),
     ),
     security(("bearer_auth" = [])),
@@ -147,11 +148,11 @@ pub async fn list_tasks(
     state: web::Data<TasksApiState>,
     user: AuthenticatedUser,
     query: web::Query<ListTasksQuery>,
-) -> Result<web::Json<ListTasksResponse>, ApiError> {
-    let result = state
+) -> Result<web::Json<Vec<TaskResponse>>, ApiError> {
+    let tasks = state
         .tasks_service
         .list_tasks(&user, query.list_id.as_deref())?;
-    Ok(web::Json(result))
+    Ok(web::Json(tasks))
 }
 
 #[utoipa::path(
@@ -244,6 +245,32 @@ pub async fn delete_task(
     Ok(HttpResponse::NoContent().finish())
 }
 
+// ── Bulk Create ───────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/tasks/bulk",
+    request_body = BulkCreateTasksRequest,
+    responses(
+        (status = 201, description = "Tasks created", body = BulkCreateTasksResponse),
+        (status = 400, description = "Invalid request (empty or >200 tasks)"),
+        (status = 404, description = "Task list not found"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "tasks"
+)]
+#[post("/tasks/bulk")]
+pub async fn bulk_create_tasks(
+    state: web::Data<TasksApiState>,
+    user: AuthenticatedUser,
+    body: web::Json<BulkCreateTasksRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let result = state
+        .tasks_service
+        .bulk_create_tasks(&user, body.into_inner())?;
+    Ok(HttpResponse::Created().json(result))
+}
+
 // ── Reorder ───────────────────────────────────────────────────────────────────
 
 #[utoipa::path(
@@ -333,11 +360,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(update_task_list)
         .service(delete_task_list)
         .service(list_tasks)
+        // bulk_create_tasks must be registered before create_task and get_task
+        // so that POST /tasks/bulk is not swallowed by the /tasks/{id} pattern.
+        .service(bulk_create_tasks)
+        .service(reorder_tasks)
         .service(create_task)
         .service(get_task)
         .service(update_task)
         .service(delete_task)
-        .service(reorder_tasks)
         .service(add_task_to_list)
         .service(remove_task_from_list);
 }
@@ -351,6 +381,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         update_task_list,
         delete_task_list,
         list_tasks,
+        bulk_create_tasks,
         create_task,
         get_task,
         update_task,
@@ -365,10 +396,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         TaskListResponse,
         ListTaskListsResponse,
         CreateTaskRequest,
+        BulkCreateTaskItem,
+        BulkCreateTasksRequest,
+        BulkCreateTasksResponse,
         UpdateTaskRequest,
         ReorderTasksRequest,
         TaskResponse,
-        ListTasksResponse,
     )),
     tags((name = "tasks", description = "Task lists and tasks")),
     security(("bearer_auth" = []))
