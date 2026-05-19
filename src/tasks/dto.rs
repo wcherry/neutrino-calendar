@@ -103,6 +103,7 @@ pub struct TaskResponse {
     pub done: bool,
     pub due_date: Option<String>,
     pub position: i32,
+    pub list_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
