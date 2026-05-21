@@ -96,14 +96,24 @@ impl TasksService {
         user: &AuthenticatedUser,
         list_id: Option<&str>,
     ) -> Result<Vec<TaskResponse>, ApiError> {
-        let records = match list_id {
+        match list_id {
             Some(lid) => {
                 self.repo.find_by_id(lid, &user.user_id)?;
-                self.repo.find_tasks_by_list_id(&user.user_id, lid)?
+                let records = self.repo.find_tasks_by_list_id(&user.user_id, lid)?;
+                let lid_owned = lid.to_string();
+                Ok(records
+                    .into_iter()
+                    .map(|r| task_to_response(r, Some(lid_owned.clone())))
+                    .collect())
             }
-            None => self.repo.find_all_tasks_by_user(&user.user_id)?,
-        };
-        Ok(records.into_iter().map(task_to_response).collect())
+            None => {
+                let records = self.repo.find_all_tasks_with_list_id_by_user(&user.user_id)?;
+                Ok(records
+                    .into_iter()
+                    .map(|(r, lid)| task_to_response(r, lid))
+                    .collect())
+            }
+        }
     }
 
     pub fn create_task(
@@ -124,7 +134,7 @@ impl TasksService {
             updated_at: now,
         };
         let saved = self.repo.insert_task(record)?;
-        Ok(task_to_response(saved))
+        Ok(task_to_response(saved, None))
     }
 
     pub fn bulk_create_tasks(
@@ -167,7 +177,7 @@ impl TasksService {
         let saved = self
             .repo
             .bulk_insert_tasks_with_memberships(task_records, membership_records)?;
-        let tasks = saved.into_iter().map(task_to_response).collect();
+        let tasks = saved.into_iter().map(|r| task_to_response(r, None)).collect();
         Ok(BulkCreateTasksResponse { tasks })
     }
 
@@ -177,7 +187,7 @@ impl TasksService {
         task_id: &str,
     ) -> Result<TaskResponse, ApiError> {
         let record = self.repo.find_task_by_id(task_id, &user.user_id)?;
-        Ok(task_to_response(record))
+        Ok(task_to_response(record, None))
     }
 
     pub fn update_task(
@@ -195,7 +205,7 @@ impl TasksService {
             updated_at: Utc::now().naive_utc(),
         };
         let updated = self.repo.update_task(task_id, &user.user_id, changes)?;
-        Ok(task_to_response(updated))
+        Ok(task_to_response(updated, None))
     }
 
     pub fn delete_task(
@@ -290,7 +300,7 @@ fn task_list_to_response(r: crate::tasks::model::TaskListRecord) -> TaskListResp
     }
 }
 
-fn task_to_response(r: crate::tasks::model::TaskRecord) -> TaskResponse {
+fn task_to_response(r: crate::tasks::model::TaskRecord, list_id: Option<String>) -> TaskResponse {
     TaskResponse {
         id: r.id,
         title: r.title,
@@ -298,6 +308,7 @@ fn task_to_response(r: crate::tasks::model::TaskRecord) -> TaskResponse {
         done: r.done,
         due_date: r.due_date.map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
         position: r.position,
+        list_id,
         created_at: r.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         updated_at: r.updated_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
     }

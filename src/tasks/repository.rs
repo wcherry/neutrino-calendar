@@ -159,6 +159,26 @@ impl TasksRepository {
             })
     }
 
+    pub fn find_all_tasks_with_list_id_by_user(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<(TaskRecord, Option<String>)>, ApiError> {
+        let mut conn = self.get_conn()?;
+        tasks::table
+            .left_join(
+                task_list_memberships::table
+                    .on(task_list_memberships::task_id.eq(tasks::id)),
+            )
+            .filter(tasks::user_id.eq(user_id))
+            .order((tasks::position.asc(), tasks::created_at.asc()))
+            .select((TaskRecord::as_select(), task_list_memberships::list_id.nullable()))
+            .load(&mut conn)
+            .map_err(|e| {
+                tracing::error!("DB list all tasks with list_id error: {:?}", e);
+                ApiError::internal("Database error")
+            })
+    }
+
     pub fn find_tasks_by_list_id(
         &self,
         user_id: &str,
