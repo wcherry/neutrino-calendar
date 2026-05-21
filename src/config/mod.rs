@@ -9,6 +9,8 @@ pub struct Config {
     pub log_level: String,
     pub log_path: Option<String>,
     pub oauth: OAuthConfig,
+    pub drive_base_url: String,
+    pub self_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +59,12 @@ impl Config {
                 .unwrap_or_else(|_| format!("{}/api/v1/connections/outlook/callback", default_base)),
         };
 
+        let drive_base_url =
+            env::var("DRIVE_URL").unwrap_or_else(|_| "http://localhost:8882".to_string());
+
+        let self_url = env::var("CALENDAR_URL")
+            .unwrap_or_else(|_| format!("http://localhost:{}", port));
+
         Ok(Config {
             database_url,
             port,
@@ -64,6 +72,8 @@ impl Config {
             log_level,
             log_path,
             oauth,
+            drive_base_url,
+            self_url,
         })
     }
 }

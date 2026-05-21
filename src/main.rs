@@ -203,6 +203,16 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     });
 
+    let version = env!("CARGO_PKG_VERSION");
+    if let Err(e) = shared::register_with_drive(
+        &config.drive_base_url,
+        "calendar",
+        &config.self_url,
+        version,
+    ).await {
+        tracing::warn!("Service registration with drive failed: {}", e);
+    }
+
     let token_service = Arc::new(TokenService::new(config.jwt_secret.clone()));
 
     let attendees_repo = Arc::new(AttendeesRepository::new(pool.clone()));
